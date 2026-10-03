@@ -1,0 +1,20 @@
+{
+    // Match ai-suite conventions: relaxed line length, 4-space list indent,
+    // sibling-only duplicate headings, fenced code blocks.
+    "config": {
+        "MD013": {
+            "line_length": 120,
+            "code_blocks": false,
+            "tables": false
+        },
+        "MD007": {
+            "indent": 4
+        },
+        "MD024": {
+            "siblings_only": true
+        },
+        "MD046": {
+            "style": "fenced"
+        }
+    }
+}

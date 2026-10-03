@@ -20,7 +20,9 @@ root are all active immediately — so a folder of gist clones behaves like a mu
 
 - Python >= 3.9 (macOS system Python is fine)
 - `git` on `PATH`
-- A GitHub token with the `gist` scope, exported as `GITHUB_TOKEN`
+- A GitHub token with the `gist` scope, provided either as `GITHUB_TOKEN` or in
+  `<workspace>/.gistpad-workspace/token` (one token per workspace, so multiple GitHub accounts
+  stay separate)
 - Optional: the `zed` CLI on `PATH` (used by `gistpad-workspace open`)
 
 ## Install
@@ -40,11 +42,13 @@ pipx install git+https://github.com/baneeishaque/gistpad-workspace.git
 ## Quickstart
 
 ```sh
-export GITHUB_TOKEN=ghp_...      # add to your shell profile
 gistpad-workspace init           # creates ~/Gists, config, manifest, and .zed/tasks.json
 gistpad-workspace sync           # clones all your gists into the workspace
 zed ~/Gists                      # open the workspace
 ```
+
+Provide the token once, either in your shell (`export GITHUB_TOKEN=ghp_...`) or as a file
+(`printf '%s\n' 'ghp_...' > ~/Gists/.gistpad-workspace/token && chmod 600 ~/Gists/.gistpad-workspace/token`).
 
 Edit files in Zed, then push from the Git panel or with `gistpad-workspace push`.
 
@@ -102,6 +106,20 @@ Interoperable with [gistpad-mcp](https://www.npmjs.com/package/gistpad-mcp) and 
   "auto_prune": false
 }
 ```
+
+## Token
+
+`GITHUB_TOKEN` (environment) wins; otherwise the workspace reads
+`<workspace>/.gistpad-workspace/token`. One token per workspace keeps multiple GitHub accounts
+separate. Keep the file private:
+
+```sh
+printf '%s\n' 'ghp_...' > ~/Gists/.gistpad-workspace/token
+chmod 600 ~/Gists/.gistpad-workspace/token
+```
+
+`gistpad-workspace doctor` reports which source is in use and warns when the file is
+group/world-readable.
 
 ## Development
 

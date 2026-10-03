@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -19,6 +20,7 @@ from gistpad_workspace.manifest import (
     save_manifest,
 )
 from gistpad_workspace.tasks import render_tasks, render_workspace_readme, write_if_changed
+from gistpad_workspace.token import resolve_token
 
 
 @dataclass
@@ -54,11 +56,23 @@ class Workspace:
         root: Path,
         config: dict[str, Any] | None = None,
         client: Any | None = None,
+        token: str | None = None,
     ) -> None:
         self.root = Path(root).expanduser()
         self.config = config if config is not None else load_config()
         self.client = client
         self.manifest = load_manifest(self.root)
+        if token is not None:
+            self.token: str | None = token
+            self.token_source: str | None = "explicit"
+        else:
+            self.token, self.token_source = resolve_token(self.root)
+
+    def git_env(self) -> dict[str, str] | None:
+        """Child-process env with GITHUB_TOKEN set for the credential helper."""
+        if not self.token:
+            return None
+        return {**os.environ, "GITHUB_TOKEN": self.token}
 
     def init(self) -> list[str]:
         actions: list[str] = []
@@ -133,7 +147,7 @@ class Workspace:
         if not path.exists():
             summary.cloned.append(desired_dir)
             if not dry_run:
-                git.clone(gist_id, self.root / desired_dir)
+                git.clone(gist_id, self.root / desired_dir, env=self.git_env())
             entry["dir"] = desired_dir
             return entry
 
@@ -156,10 +170,10 @@ class Workspace:
             elif dry_run:
                 summary.pulled.append(entry["dir"])
             else:
-                git.fetch(path)
+                git.fetch(path, env=self.git_env())
                 ahead, behind = git.ahead_behind(path)
                 if behind:
-                    git.pull_ff_only(path)
+                    git.pull_ff_only(path, env=self.git_env())
                     summary.pulled.append(entry["dir"])
                 elif ahead:
                     summary.ahead.append(entry["dir"])
@@ -198,7 +212,7 @@ class Workspace:
                 results.append((entry["dir"], "nothing to push"))
                 continue
             try:
-                git.push(repo)
+                git.push(repo, env=self.git_env())
             except GistpadError as exc:
                 raise GistpadError(
                     f"{entry['dir']}: {exc} If the remote moved, pull/merge in Zed's Git panel "
@@ -282,7 +296,7 @@ class Workspace:
         self.save()
         target = self.root / dir_name
         if not target.exists():
-            git.clone(gist["id"], target)
+            git.clone(gist["id"], target, env=self.git_env())
         return entry
 
     def apply_rename(self, entry: dict[str, Any]) -> str | None:

@@ -139,9 +139,11 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "GitHubClient", lambda *args, **kwargs: fake)
     monkeypatch.setattr(cli.shutil, "which", lambda name: None)
     monkeypatch.setattr(git_module, "is_dirty", lambda repo: False)
-    monkeypatch.setattr(git_module, "clone", lambda gist_id, dest: Path(dest).mkdir(parents=True))
-    monkeypatch.setattr(git_module, "fetch", lambda repo: None)
-    monkeypatch.setattr(git_module, "pull_ff_only", lambda repo: None)
+    monkeypatch.setattr(
+        git_module, "clone", lambda gist_id, dest, env=None: Path(dest).mkdir(parents=True)
+    )
+    monkeypatch.setattr(git_module, "fetch", lambda repo, env=None: None)
+    monkeypatch.setattr(git_module, "pull_ff_only", lambda repo, env=None: None)
     monkeypatch.setattr(git_module, "ahead_behind", lambda repo: (0, 0))
     return SimpleNamespace(root=tmp_path, fake=fake)
 
@@ -347,8 +349,45 @@ def test_doctor_reports_checks(env, monkeypatch, capsys):
 
     out = capsys.readouterr().out
     assert rc == 0
-    assert "ok: GITHUB_TOKEN is set" in out
+    assert "ok: token from GITHUB_TOKEN environment variable" in out
     assert "ok: GitHub API reachable as tester" in out
+
+
+def test_doctor_reports_token_file_and_permissions(env, monkeypatch, capsys):
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    token_path = env.root / ".gistpad-workspace" / "token"
+    token_path.parent.mkdir(parents=True)
+    token_path.write_text("file-token\n", encoding="utf-8")
+    token_path.chmod(0o644)
+    monkeypatch.setattr(cli.shutil, "which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(
+        cli.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(stdout="git version 2.x", returncode=0),
+    )
+
+    rc = cli.main(["doctor"])
+
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "ok: token from token file" in out
+    assert "chmod 600" in out
+
+
+def test_doctor_fails_without_token(env, monkeypatch, capsys):
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.setattr(cli.shutil, "which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(
+        cli.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(stdout="git version 2.x", returncode=0),
+    )
+
+    rc = cli.main(["doctor"])
+
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "fail: no token found" in out
 
 
 def test_main_reports_errors(env, capsys):

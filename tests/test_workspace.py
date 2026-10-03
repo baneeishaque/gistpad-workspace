@@ -87,16 +87,37 @@ def make_workspace(tmp_path, gists, starred=None, auto_rename=True, auto_prune=F
 @pytest.fixture
 def git_stub(monkeypatch):
     calls = SimpleNamespace(
-        clones=[], fetches=[], pulls=[], pushes=[], commits=[], dirty=False, ahead=0, behind=0
+        clones=[],
+        fetches=[],
+        pulls=[],
+        pushes=[],
+        commits=[],
+        envs=[],
+        dirty=False,
+        ahead=0,
+        behind=0,
     )
 
-    def clone(gist_id, dest):
+    def clone(gist_id, dest, env=None):
         calls.clones.append((gist_id, str(dest)))
+        calls.envs.append(env)
         Path(dest).mkdir(parents=True)
 
+    def fetch(repo, env=None):
+        calls.fetches.append(str(repo))
+        calls.envs.append(env)
+
+    def pull_ff_only(repo, env=None):
+        calls.pulls.append(str(repo))
+        calls.envs.append(env)
+
+    def push(repo, env=None):
+        calls.pushes.append(str(repo))
+        calls.envs.append(env)
+
     monkeypatch.setattr(git, "clone", clone)
-    monkeypatch.setattr(git, "fetch", lambda repo: calls.fetches.append(str(repo)))
-    monkeypatch.setattr(git, "pull_ff_only", lambda repo: calls.pulls.append(str(repo)))
+    monkeypatch.setattr(git, "fetch", fetch)
+    monkeypatch.setattr(git, "pull_ff_only", pull_ff_only)
     monkeypatch.setattr(git, "is_dirty", lambda repo: calls.dirty)
     monkeypatch.setattr(git, "ahead_behind", lambda repo: (calls.ahead, calls.behind))
     monkeypatch.setattr(
@@ -104,7 +125,7 @@ def git_stub(monkeypatch):
         "commit_all",
         lambda repo, message: calls.commits.append((str(repo), message)) or True,
     )
-    monkeypatch.setattr(git, "push", lambda repo: calls.pushes.append(str(repo)))
+    monkeypatch.setattr(git, "push", push)
     return calls
 
 
@@ -201,6 +222,32 @@ def test_sync_dry_run_makes_no_changes(tmp_path, git_stub):
     assert not (tmp_path / DIR_NAME).exists()
     assert not (tmp_path / ".gistpad-workspace" / "manifest.json").exists()
     assert not (tmp_path / ".zed" / "tasks.json").exists()
+
+
+def test_sync_passes_token_file_to_git_env(tmp_path, git_stub, monkeypatch):
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    token_path = tmp_path / ".gistpad-workspace" / "token"
+    token_path.parent.mkdir(parents=True)
+    token_path.write_text("file-token\n", encoding="utf-8")
+    ws = make_workspace(tmp_path, [make_gist()])
+    assert ws.token == "file-token"
+
+    ws.sync()
+
+    assert git_stub.envs[0]["GITHUB_TOKEN"] == "file-token"
+
+
+def test_env_token_wins_over_token_file(tmp_path, git_stub, monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "env-token")
+    token_path = tmp_path / ".gistpad-workspace" / "token"
+    token_path.parent.mkdir(parents=True)
+    token_path.write_text("file-token\n", encoding="utf-8")
+    ws = make_workspace(tmp_path, [make_gist()])
+    assert ws.token == "env-token"
+
+    ws.sync()
+
+    assert git_stub.envs[0]["GITHUB_TOKEN"] == "env-token"
 
 
 def test_resolve_by_id_prefix_dir_and_description(tmp_path):

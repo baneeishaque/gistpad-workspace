@@ -68,7 +68,9 @@ activates every gist folder as a repository in its Git panel.
 
 ## Requirements
 
-- `GITHUB_TOKEN` exported in your shell profile (scope: `gist`).
+- A GitHub token (scope: `gist`), provided either as `GITHUB_TOKEN` in your
+  environment or in `.gistpad-workspace/token` (one token per workspace, so
+  multiple GitHub accounts stay separate).
 - Tasks are defined in `.zed/tasks.json` (regenerated on sync).
 
 ## Notes

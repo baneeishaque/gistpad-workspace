@@ -5,7 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-10-03
+
+### Added
+
+- Workspace-scoped token file: `GITHUB_TOKEN` wins, otherwise the token is read from
+  `<workspace>/.gistpad-workspace/token` — one token per workspace, so different workspaces can
+  use different GitHub accounts; git subprocesses receive the resolved token via their
+  environment.
+- `doctor` reports the token source and warns when the token file is group/world-readable.
+
+## [0.1.0] - 2026-10-03
 
 ### Added
 

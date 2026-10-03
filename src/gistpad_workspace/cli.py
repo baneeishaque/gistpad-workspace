@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 import shutil
 import subprocess
 import sys
@@ -15,6 +14,7 @@ from gistpad_workspace import conventions as conv
 from gistpad_workspace.api import GitHubClient
 from gistpad_workspace.config import load_config, workspace_root
 from gistpad_workspace.errors import GistpadError
+from gistpad_workspace.token import token_file_path
 from gistpad_workspace.workspace import SyncSummary, Workspace
 
 
@@ -27,8 +27,10 @@ def _workspace(args: argparse.Namespace, need_client: bool = False) -> Workspace
     config = load_config()
     root = getattr(args, "root", None)
     base = Path(root).expanduser() if root else workspace_root(config)
-    client = GitHubClient() if need_client else None
-    return Workspace(base, config=config, client=client)
+    ws = Workspace(base, config=config)
+    if need_client:
+        ws.client = GitHubClient(token=ws.token)
+    return ws
 
 
 def _resolve(ws: Workspace, args: argparse.Namespace) -> dict[str, Any]:
@@ -80,7 +82,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     for action in ws.init():
         print(action)
     if args.sync:
-        ws.client = GitHubClient()
+        ws.client = GitHubClient(token=ws.token)
         _print_sync(ws.sync())
     return 0
 
@@ -376,12 +378,20 @@ def cmd_url(args: argparse.Namespace) -> int:
 
 def cmd_doctor(args: argparse.Namespace) -> int:
     failures = 0
-    token = os.environ.get("GITHUB_TOKEN")
-    if token:
-        print("ok: GITHUB_TOKEN is set")
+    config = load_config()
+    root = workspace_root(config)
+    ws = Workspace(root, config=config)
+
+    if ws.token:
+        print(f"ok: token from {ws.token_source}")
+        path = token_file_path(root)
+        if path.exists() and (path.stat().st_mode & 0o077):
+            print(f"warn: {path} is group/world-readable; chmod 600 it")
     else:
         failures += 1
-        print("fail: GITHUB_TOKEN is not set (export a token with the 'gist' scope)")
+        print(
+            f"fail: no token found; set GITHUB_TOKEN or write {token_file_path(root)} (scope: gist)"
+        )
 
     git_path = shutil.which("git")
     if git_path:
@@ -397,21 +407,18 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     else:
         print("warn: zed CLI not found; 'open' and 'daily --open' will print paths")
 
-    if token:
+    if ws.token:
         try:
-            user = GitHubClient().get_user()
+            user = GitHubClient(token=ws.token).get_user()
             print(f"ok: GitHub API reachable as {user.get('login')}")
         except GistpadError as exc:
             failures += 1
             print(f"fail: {exc}")
 
-    config = load_config()
-    root = workspace_root(config)
     if root.exists():
         print(f"ok: workspace root {root}")
     else:
         print(f"warn: workspace root {root} does not exist yet (run 'gistpad-workspace init')")
-    ws = Workspace(root, config=config)
     print(f"ok: manifest lists {len(ws.manifest['gists'])} gists")
     return 1 if failures else 0
 

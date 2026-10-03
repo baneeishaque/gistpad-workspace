@@ -15,7 +15,10 @@ def auth_args() -> list[str]:
 
 
 def run_git(
-    args: list[str], cwd: Path | None = None, check: bool = True
+    args: list[str],
+    cwd: Path | None = None,
+    check: bool = True,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     command = ["git", *args]
     result = subprocess.run(
@@ -23,22 +26,23 @@ def run_git(
         cwd=str(cwd) if cwd is not None else None,
         capture_output=True,
         text=True,
+        env=env,
     )
     if check and result.returncode != 0:
         raise GistpadError(f"git {' '.join(args)} failed: {result.stderr.strip()}")
     return result
 
 
-def clone(gist_id: str, dest: Path) -> None:
-    run_git([*auth_args(), "clone", f"https://gist.github.com/{gist_id}.git", str(dest)])
+def clone(gist_id: str, dest: Path, env: dict[str, str] | None = None) -> None:
+    run_git([*auth_args(), "clone", f"https://gist.github.com/{gist_id}.git", str(dest)], env=env)
 
 
-def fetch(repo: Path) -> None:
-    run_git([*auth_args(), "fetch", "origin"], cwd=repo)
+def fetch(repo: Path, env: dict[str, str] | None = None) -> None:
+    run_git([*auth_args(), "fetch", "origin"], cwd=repo, env=env)
 
 
-def pull_ff_only(repo: Path) -> None:
-    run_git([*auth_args(), "pull", "--ff-only"], cwd=repo)
+def pull_ff_only(repo: Path, env: dict[str, str] | None = None) -> None:
+    run_git([*auth_args(), "pull", "--ff-only"], cwd=repo, env=env)
 
 
 def is_dirty(repo: Path) -> bool:
@@ -62,5 +66,5 @@ def commit_all(repo: Path, message: str) -> bool:
     return result.returncode == 0
 
 
-def push(repo: Path) -> None:
-    run_git([*auth_args(), "push"], cwd=repo)
+def push(repo: Path, env: dict[str, str] | None = None) -> None:
+    run_git([*auth_args(), "push"], cwd=repo, env=env)

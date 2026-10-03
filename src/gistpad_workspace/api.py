@@ -44,8 +44,10 @@ class GitHubClient:
         resolved = token or os.environ.get("GITHUB_TOKEN")
         if not resolved:
             raise AuthError(
-                "GITHUB_TOKEN is not set. Export a GitHub token with the 'gist' scope, "
-                "e.g. export GITHUB_TOKEN=ghp_..."
+                "No GitHub token found. Set GITHUB_TOKEN, or write the token to "
+                "<workspace>/.gistpad-workspace/token (one token per workspace, so "
+                "multiple GitHub accounts stay separate). Create one at "
+                "https://github.com/settings/tokens with the 'gist' scope."
             )
         self._token = resolved
         self._timeout = timeout

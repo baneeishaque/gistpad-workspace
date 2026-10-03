@@ -39,6 +39,33 @@ def test_run_git_passes_through_on_success(monkeypatch):
     assert result.stdout == "ok"
 
 
+def test_run_git_forwards_env(monkeypatch):
+    captured = {}
+
+    def fake_run(*args, **kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(git.subprocess, "run", fake_run)
+    env = {"GITHUB_TOKEN": "x"}
+    git.run_git(["status"], env=env)
+    assert captured["env"] == env
+
+
+def test_push_forwards_env(monkeypatch):
+    captured = {}
+
+    def fake_run(*args, **kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(git.subprocess, "run", fake_run)
+    env = {"GITHUB_TOKEN": "x"}
+    git.push(Path("/repo"), env=env)
+    assert captured["env"] == env
+    assert captured["cwd"] == "/repo"
+
+
 def test_is_dirty(monkeypatch):
     monkeypatch.setattr(
         git.subprocess,

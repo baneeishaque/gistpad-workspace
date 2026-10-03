@@ -1,0 +1,16 @@
+#!/usr/bin/env python3
+"""Development-only runner: executes gistpad-workspace from the in-repo source tree.
+
+Published installs get a real console script via pipx/mise; this file exists so
+the CLI can be exercised without installing anything.
+"""
+
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
+
+from gistpad_workspace.cli import main
+
+if __name__ == "__main__":
+    raise SystemExit(main())
